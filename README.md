@@ -30,3 +30,18 @@ Designed with a "Mobile-First" philosophy specifically for the MD on the move.
 * **Margin Integrity Protection:** Displays both top-line revenue and gross margin percentages by branch, ensuring that a high volume of low-margin sales doesn't mask a drop in profitability.
 ---
 ## 📐 DAX & Data Transformation Highlights
+ByRankAll Today = 
+RANK(
+    SKIP,
+    ALL('MPDSMD - Today'),
+    ORDERBY('Measures Table'[Profit for rank], DESC, 'MPDSMD - Today'[Branch], ASC)
+)
+---
+ByRankX = IF(
+    HASONEVALUE('MPDSMD - Today'[Branch]),
+        RANKX(
+            ALLSELECTED('MPDSMD - Today'), 
+            CALCULATE(
+SUM('MPDSMD - Today'[Profit])),
+            ,
+            DESC, Dense))
