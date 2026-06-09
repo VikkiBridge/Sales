@@ -30,6 +30,10 @@ Designed with a "Mobile-First" philosophy specifically for the MD on the move.
 * **Margin Integrity Protection:** Displays both top-line revenue and gross margin percentages by branch, ensuring that a high volume of low-margin sales doesn't mask a drop in profitability.
 ---
 ## 📐 DAX & Data Transformation Highlights
+
+Below are examples of the core logic utilised in the model to compute the time horizons and mobile metrics efficiently:
+```dax
+// Ranking the branches by the profit in ascending order 
 ByRankAll Today = 
 RANK(
     SKIP,
@@ -37,11 +41,11 @@ RANK(
     ORDERBY('Measures Table'[Profit for rank], DESC, 'MPDSMD - Today'[Branch], ASC)
 )
 ---
-ByRankX = IF(
-    HASONEVALUE('MPDSMD - Today'[Branch]),
-        RANKX(
-            ALLSELECTED('MPDSMD - Today'), 
-            CALCULATE(
-SUM('MPDSMD - Today'[Profit])),
-            ,
-            DESC, Dense))
+```dax
+// Create the percentage for a table total
+End of Month Perc% = 
+    DIVIDE(
+SUM('MPDSMM - End of Month'[Margin-MTD]),
+SUM('MPDSMM - End of Month'[Sales-MTD]),
+0
+) 
