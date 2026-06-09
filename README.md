@@ -40,7 +40,7 @@ RANK(
     ALL('MPDSMD - Today'),
     ORDERBY('Measures Table'[Profit for rank], DESC, 'MPDSMD - Today'[Branch], ASC)
 )
----
+
 // Create the percentage for a table total
 End of Month Perc% = 
     DIVIDE(
