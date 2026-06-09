@@ -1,0 +1,28 @@
+let
+    Source = Csv.Document(File.Contents("\\10.181.250.60\Exports\SALES\MPDSMD.txt"),[Delimiter="#(tab)", Encoding=1252, QuoteStyle=QuoteStyle.None]),
+    #"Removed Top Rows" = Table.Skip(Source,9),
+    #"Split Column by Character Transition1" = Table.SplitColumn(#"Removed Top Rows", "Column1", Splitter.SplitTextByCharacterTransition((c) => not List.Contains({"0".."9"}, c), {"0".."9"}), {"Column1.1", "Column1.2", "Column1.3", "Column1.4", "Column1.5", "Column1.6", "Column1.7", "Column1.8", "Column1.9"}),
+    #"Split Column by Delimiter1" = Table.SplitColumn(#"Split Column by Character Transition1", "Column1.1", Splitter.SplitTextByEachDelimiter({" "}, QuoteStyle.Csv, false), {"Column1.1.1", "Column1.1.2"}),
+    #"Merged Columns Sales" = Table.CombineColumns(#"Split Column by Delimiter1",{"Column1.2", "Column1.3"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Sales-MTD"),
+    #"Merged Columns Cost" = Table.CombineColumns(#"Merged Columns Sales",{"Column1.4", "Column1.5"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Cost-MTD"),
+    #"Merged Columns Margin" = Table.CombineColumns(#"Merged Columns Cost",{"Column1.6", "Column1.7"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Margin-MTD"),
+    #"Merged Columns Perc%" = Table.CombineColumns(#"Merged Columns Margin",{"Column1.8", "Column1.9"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Perc%"),
+    #"Split Column by Delimiter2" = Table.SplitColumn(#"Merged Columns Perc%", "Sales-MTD", Splitter.SplitTextByEachDelimiter({" "}, QuoteStyle.Csv, false), {"Sales-MTD.1", "Sales-MTD.2"}),
+    #"Split Column by Delimiter3" = Table.SplitColumn(#"Split Column by Delimiter2", "Cost-MTD", Splitter.SplitTextByEachDelimiter({" "}, QuoteStyle.Csv, false), {"Cost-MTD.1", "Cost-MTD.2"}),
+    #"Split Column by Delimiter4" = Table.SplitColumn(#"Split Column by Delimiter3", "Margin-MTD", Splitter.SplitTextByEachDelimiter({" "}, QuoteStyle.Csv, false), {"Margin-MTD.1", "Margin-MTD.2"}),
+    #"Trimmed Text" = Table.TransformColumns(#"Split Column by Delimiter4",{{"Column1.1.2", Text.Trim, type text}, {"Sales-MTD.2", Text.Trim, type text}, {"Cost-MTD.2", Text.Trim, type text}, {"Margin-MTD.2", Text.Trim, type text}}),
+    #"Merged Columns" = Table.CombineColumns(#"Trimmed Text",{"Column1.1.2", "Sales-MTD.1"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Sales-MTD"),
+    #"Merged Columns1" = Table.CombineColumns(#"Merged Columns",{"Sales-MTD.2", "Cost-MTD.1"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Cost-MTD"),
+    #"Merged Columns2" = Table.CombineColumns(#"Merged Columns1",{"Cost-MTD.2", "Margin-MTD.1"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Margin-MTD"),
+    #"Merged Columns3" = Table.CombineColumns(#"Merged Columns2",{"Margin-MTD.2", "Perc%"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Perc%.1"),
+    #"Renamed Columns4" = Table.RenameColumns(#"Merged Columns3",{{"Perc%.1", "Perc%"}, {"Column1.1.1", "Branch"}}),
+    #"Changed Type3" = Table.TransformColumnTypes(#"Renamed Columns4",{{"Sales-MTD", Currency.Type}, {"Cost-MTD", Currency.Type}, {"Perc%", type number}, {"Margin-MTD", Currency.Type}}),
+    #"Filtered Rows1" = Table.SelectRows(#"Changed Type3", each ([Branch] <> "" and [Branch] <> "--------------------------------------------------------")),
+    #"Inserted Division" = Table.AddColumn(#"Filtered Rows1", "Division", each [#"Perc%"] / 100, type number),
+    #"Renamed Columns1" = Table.RenameColumns(#"Inserted Division",{{"Division", "Percentage%"}}),
+    #"Filtered Rows" = Table.SelectRows(#"Renamed Columns1", each ([#"Percentage%"] <> null)),
+    #"Split Column by Delimiter" = Table.SplitColumn(#"Filtered Rows", "Branch", Splitter.SplitTextByDelimiter(" ", QuoteStyle.Csv), {"Branch.1", "Branch.2", "Branch.3", "Branch.4", "Branch.5", "Branch.6", "Branch.7", "Branch.8", "Branch.9", "Branch.10", "Branch.11", "Branch.12", "Branch.13", "Branch.14", "Branch.15", "Branch.16", "Branch.17"}),
+    #"Renamed Columns2" = Table.RenameColumns(#"Split Column by Delimiter",{{"Branch.1", "Branch"}}),
+    #"Removed Other Columns" = Table.SelectColumns(#"Renamed Columns2",{"Branch", "Sales-MTD", "Cost-MTD", "Margin-MTD", "Perc%", "Percentage%"})
+in
+    #"Removed Other Columns"

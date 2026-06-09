@@ -1,0 +1,43 @@
+let
+    //1. Get the list of files in that specific folder
+    Directory = Folder.Files("\\10.181.---.--\Exports\SALES"),
+    //2. Filter the list to find only your specific file
+    FileMetadata = Table.SelectRows(Directory, each ([Name] = "MPDSM.txt")),
+    //3. Extract the data from the "Date modified" column
+    FileDateModified = FileMetadata{0}[Date modified],
+    //4. Now proceed with your existing data import
+    Source = Csv.Document(File.Contents("\\10.181.250.60\Exports\SALES\MPDSM.txt"),[Delimiter=":", Columns=4, Encoding=1252, QuoteStyle=QuoteStyle.None]),
+    #"Removed Top Rows" = Table.Skip(Source,9),
+    #"Removed Columns1" = Table.RemoveColumns(#"Removed Top Rows",{"Column2", "Column3", "Column4"}),
+    #"Split Column by Character Transition" = Table.SplitColumn(#"Removed Columns1", "Column1", Splitter.SplitTextByCharacterTransition((c) => not List.Contains({"0".."9"}, c), {"0".."9"}), {"Column1.1", "Column1.2", "Column1.3", "Column1.4", "Column1.5", "Column1.6", "Column1.7", "Column1.8", "Column1.9"}),
+    #"Merged Columns Sales" = Table.CombineColumns(#"Split Column by Character Transition",{"Column1.2", "Column1.3"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Sales-MTD"),
+    #"Merged Columns Cost" = Table.CombineColumns(#"Merged Columns Sales",{"Column1.4", "Column1.5"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Cost-MTD"),
+    #"Merged Columns Margin" = Table.CombineColumns(#"Merged Columns Cost",{"Column1.6", "Column1.7"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Margin-MTD"),
+    #"Merged Columns Perc%" = Table.CombineColumns(#"Merged Columns Margin",{"Column1.8", "Column1.9"},Combiner.CombineTextByDelimiter("", QuoteStyle.None),"Perc%"),
+    #"Changed Type2" = Table.TransformColumnTypes(#"Merged Columns Perc%",{{"Perc%", type number}}),
+    #"Renamed Columns" = Table.RenameColumns(#"Changed Type2",{{"Column1.1", "Branch"}}),
+    #"Changed Type" = Table.TransformColumnTypes(#"Renamed Columns",{{"Sales-MTD", Currency.Type}, {"Cost-MTD", Currency.Type}, {"Margin-MTD", Currency.Type}}),
+    #"Inserted Division" = Table.AddColumn(#"Changed Type", "Division", each [#"Perc%"] / 100, type number),
+    #"Renamed Columns1" = Table.RenameColumns(#"Inserted Division",{{"Division", "Percentage%"}}),
+    #"Filtered Rows" = Table.SelectRows(#"Renamed Columns1", each ([#"Percentage%"] <> null) and ([Branch] <> "                    ")),
+    #"Added Custom" = Table.AddColumn(#"Filtered Rows", "Yesterday's Date", each Date.AddDays(DateTime.Date( DateTime.LocalNow() ),-1)),
+    #"Changed Type1" = Table.TransformColumnTypes(#"Added Custom",{{"Yesterday's Date", type date}}),
+    #"Inserted Month Name" = Table.AddColumn(#"Changed Type1", "Month Name", each Date.MonthName([#"Yesterday's Date"]), type text),
+    #"Trimmed Text" = Table.TransformColumns(#"Inserted Month Name",{{"Branch", Text.Trim, type text}}),
+    #"Inserted Start of Month" = Table.AddColumn(#"Trimmed Text", "Start of Month", each Date.StartOfMonth([#"Yesterday's Date"]), type date),
+    #"Filtered Rows1" = Table.SelectRows(#"Inserted Start of Month", each ([Branch] <> "" and [Branch] <> "HOEXPORT      -" and [Branch] <> "SALTASH")),
+    #"Merged Queries" = Table.NestedJoin(#"Filtered Rows1", {"Branch"}, #"Targets Sheet", {"Branch"}, "Targets Sheet", JoinKind.LeftOuter),
+    #"Expanded Targets Sheet" = Table.ExpandTableColumn(#"Merged Queries", "Targets Sheet", {"Branch.1", "Budget GP%", "Daily Sales Target £"}, {"Branch.1", "Budget GP%", "Daily Sales Target £"}),
+    #"Renamed Columns3" = Table.RenameColumns(#"Expanded Targets Sheet",{{"Daily Sales Target £", "Daily Sales Target"}}),
+    #"Duplicated Column1" = Table.DuplicateColumn(#"Renamed Columns3", "Daily Sales Target", "Daily Sales Target - Copy"),
+    #"Renamed Columns5" = Table.RenameColumns(#"Duplicated Column1",{{"Daily Sales Target - Copy", "Target to Date"}}),
+    #"Inserted Multiplication" = Table.AddColumn(#"Renamed Columns5", "Multiplication", each [Daily Sales Target] * [#"Budget GP%"], type number),
+    #"Renamed Columns2" = Table.RenameColumns(#"Inserted Multiplication",{{"Multiplication", "GP Target Daily"}, {"Target to Date", "Target 1 day"}}),
+    #"Filtered Rows3" = Table.SelectRows(#"Renamed Columns2", each ([Branch.1] <> null)),
+    #"Sorted Rows" = Table.Sort(#"Filtered Rows3",{{"Branch", Order.Ascending}}),
+    #"Merged Queries1" = Table.NestedJoin(#"Sorted Rows", {"Branch"}, #"Branch List", {"Account"}, "Branch List", JoinKind.LeftOuter),
+    #"Expanded Branch List" = Table.ExpandTableColumn(#"Merged Queries1", "Branch List", {"Region"}, {"Region"}),
+    #"Added Update Date" = Table.AddColumn(#"Expanded Branch List","File Update Date", each FileDateModified),
+    #"Changed Type3" = Table.TransformColumnTypes(#"Added Update Date",{{"File Update Date", type datetime}})
+in
+    #"Changed Type3"
